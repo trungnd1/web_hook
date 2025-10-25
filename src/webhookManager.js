@@ -21,97 +21,89 @@ class WebhookManager {
   }
 
   // ==================== CREATE WEBHOOK ====================
-    async createWebhook(webhookData) {
-        console.log('📦 CREATE WEBHOOK REQUEST:', webhookData);
-        
-        try {
-            const { name, description, platform, endpointPath, authentication = {}, security = {} } = webhookData;
+  async createWebhook(webhookData) {
+      console.log('📦 CREATE WEBHOOK REQUEST:', webhookData);
+      
+      try {
+          const { name, description, platform, endpointPath, authentication = {}, security = {} } = webhookData;
 
-            // Validate required fields
-            if (!name || !endpointPath) {
-                throw new Error('Name and endpoint path are required');
-            }
+          // Validate required fields
+          if (!name || !endpointPath) {
+              throw new Error('Name and endpoint path are required');
+          }
 
-            console.log('✅ Validation passed');
+          console.log('✅ Validation passed');
 
-            // Sanitize endpointPath
-            const sanitizedEndpointPath = endpointPath.startsWith('/') 
-                ? endpointPath.substring(1) 
-                : endpointPath;
+          // Sanitize endpointPath
+          const sanitizedEndpointPath = endpointPath.startsWith('/') 
+              ? endpointPath.substring(1) 
+              : endpointPath;
 
-            console.log('🔧 Sanitized endpoint path:', sanitizedEndpointPath);
+          console.log('🔧 Sanitized endpoint path:', sanitizedEndpointPath);
 
-            // Generate unique webhookId
-            const webhookId = this.generateWebhookId();
-            console.log('🆕 Generated webhookId:', webhookId);
-            
-            // Check if endpoint path already exists
-            console.log('🔍 Checking endpoint path uniqueness...');
-            const existingWebhook = await firestore.findWebhookByEndpointPath(sanitizedEndpointPath);
-            
-            if (existingWebhook) {
-                console.log('❌ Endpoint path conflict detected');
-                throw new Error(`Endpoint path "${sanitizedEndpointPath}" already exists`);
-            }
-            
-            console.log('✅ Endpoint path is unique');
+          // Generate unique webhookId
+          const webhookId = this.generateWebhookId();
+          console.log('🆕 Generated webhookId:', webhookId);
+          
+          // Check if endpoint path already exists
+          console.log('🔍 Checking endpoint path uniqueness...');
+          const existingWebhook = await firestore.findWebhookByEndpointPath(sanitizedEndpointPath);
+          
+          if (existingWebhook) {
+              console.log('❌ Endpoint path conflict detected');
+              throw new Error(`Endpoint path "${sanitizedEndpointPath}" already exists`);
+          }
+          
+          console.log('✅ Endpoint path is unique');
 
-            // Create webhook configuration
-            const webhookConfig = {
-                id: webhookId,
-                name,
-                description: description || '',
-                platform: platform || 'custom',
-                endpointPath: sanitizedEndpointPath,
-                authentication: {
-                    method: authentication.method || 'none',
-                    secret: authentication.secret || '',
-                    signatureHeader: authentication.signatureHeader || 'x-signature'
-                },
-                security: {
-                    ipWhitelist: security.ipWhitelist || [],
-                    rateLimit: security.rateLimit || { requests: 100, period: 'minute' },
-                    sslRequired: security.sslRequired !== false
-                },
-                isActive: true,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                totalRequests: 0,
-                errorCount: 0,
-                fullUrl: this.generateWebhookUrl(webhookId, sanitizedEndpointPath)
-            };
+          // Create webhook configuration với user info
+          const webhookConfig = {
+              id: webhookId,
+              name,
+              description: description || '',
+              platform: platform || 'custom',
+              endpointPath: sanitizedEndpointPath,
+              authentication: {
+                  method: authentication.method || 'none',
+                  secret: authentication.secret || '',
+                  signatureHeader: authentication.signatureHeader || 'x-signature'
+              },
+              security: {
+                  ipWhitelist: security.ipWhitelist || [],
+                  rateLimit: security.rateLimit || { requests: 100, period: 'minute' },
+                  sslRequired: security.sslRequired !== false
+              },
+              isActive: true,
+              createdBy: webhookData.createdBy || 'unknown',
+              creatorEmail: webhookData.creatorEmail || 'unknown',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              totalRequests: 0,
+              errorCount: 0,
+              fullUrl: this.generateWebhookUrl(webhookId, sanitizedEndpointPath)
+          };
 
-            console.log('💾 Saving to Firestore...');
+          console.log('💾 Saving to Firestore...');
 
-            // Save to Firestore
-            await firestore.createWebhook(webhookId, webhookConfig);
+          // Save to Firestore
+          await firestore.createWebhook(webhookId, webhookConfig);
 
-            console.log('✅ Webhook saved successfully');
+          console.log('✅ Webhook saved successfully');
 
-            // ✅ FIX: Tạo response rõ ràng
-            const response = {
-                success: true,
-                webhook: webhookConfig,
-                message: 'Webhook created successfully'
-            };
+          const response = {
+              success: true,
+              webhook: webhookConfig,
+              message: 'Webhook created successfully'
+          };
 
-            console.log('📤 Sending response:', JSON.stringify(response, null, 2));
+          console.log('📤 Sending response:', JSON.stringify(response, null, 2));
+          return response;
 
-            return response;
-
-        } catch (error) {
-            console.error('❌ CREATE WEBHOOK ERROR:', error);
-            
-            // ✅ FIX: Trả về error response rõ ràng
-            const errorResponse = {
-            success: false,
-            error: error.message
-            };
-            
-            console.log('📤 Sending error response:', JSON.stringify(errorResponse, null, 2));
-            throw error;
-        }
-    }
+      } catch (error) {
+          console.error('❌ CREATE WEBHOOK ERROR:', error);
+          throw error;
+      }
+  }
 
   // ==================== GENERATE WEBHOOK URL ====================
   generateWebhookUrl(webhookId, endpointPath) {

@@ -19,7 +19,8 @@
   "dependencies": {
     "@google-cloud/functions-framework": "^3.0.0",
     "firebase-admin": "^12.1.0",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "crypto": "^1.0.1"
   },
   "devDependencies": {
     "jest": "^29.0.0"

@@ -1,4 +1,4 @@
-// web_hook/index.js - FIXED ROUTING FOR GEN2
+// web_hook/index.js - FIXED ROUTING FOR GEN2 WITH AUTHENTICATION
 import functions from '@google-cloud/functions-framework';
 import admin from 'firebase-admin';
 
@@ -15,13 +15,14 @@ try {
 }
 
 // Import handlers SAU KHI Firebase init
-let webhookHandler, webhookManager;
+let webhookHandler, webhookManager, authMiddleware;
 try {
   // Thêm delay nhỏ để đảm bảo Firebase init hoàn tất
   await new Promise(resolve => setTimeout(resolve, 100));
   
   webhookHandler = (await import('./src/webhookHandler.js')).default;
   webhookManager = (await import('./src/webhookManager.js')).default;
+  authMiddleware = (await import('./middleware/authMiddleware.js')).default;
   console.log('All handlers imported successfully');
 } catch (error) {
   console.error('Handler import failed:', error);
@@ -32,6 +33,9 @@ try {
   webhookManager = { 
     createWebhook: () => ({ success: false, error: "Manager not loaded" }),
     listWebhooks: () => ({ success: false, error: "Manager not loaded" })
+  };
+  authMiddleware = {
+    authenticate: () => ({ valid: true, isPublic: true })
   };
 }
 
@@ -44,7 +48,7 @@ functions.http('health', (req, res) => {
     status: 'healthy',
     service: 'webhook-service',
     timestamp: new Date().toISOString(),
-    version: '2.0.3'
+    version: '2.1.0'
   });
 });
 
@@ -53,7 +57,7 @@ functions.http('webhookService', async (req, res) => {
   // Set CORS headers
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-signature');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, x-signature');
 
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
@@ -62,14 +66,21 @@ functions.http('webhookService', async (req, res) => {
 
   try {
     const path = req.path;
-    console.log(`Received ${req.method} request for path: ${path}`);
+    console.log(`🌐 Received ${req.method} request for path: ${path}`);
 
-    // ✅ FIX: Routing chính xác hơn
+    // Authentication check
+    const authResult = await authMiddleware.authenticate(req, res);
+    if (!authResult.valid) {
+      return; // Response already sent
+    }
+
+    // Routing
     if (path === '/health' || path === '/') {
       return res.status(200).json({ 
         status: 'healthy',
         service: 'webhook-service',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        version: '2.1.0'
       });
     }
     else if (path.startsWith('/webhooks/') && path.split('/').length >= 4) {
@@ -88,7 +99,9 @@ functions.http('webhookService', async (req, res) => {
           'POST /webhooks/{webhookId}/{endpointPath}',
           'GET /api/webhooks',
           'POST /api/webhooks',
-          'GET /api/webhooks/{id}'
+          'GET /api/webhooks/{id}',
+          'PUT /api/webhooks/{id}',
+          'DELETE /api/webhooks/{id}'
         ]
       });
     }
@@ -141,15 +154,13 @@ async function handleWebhookReceiver(req, res) {
 // ==================== MANAGEMENT API HANDLER ====================
 async function handleManagementAPI(req, res) {
   try {
-  
     const path = req.path;
     const method = req.method;
 
-    console.log('🔍 CLIENT REQUEST DETAILS:');
+    console.log('🔍 MANAGEMENT API REQUEST:');
+    console.log('User:', req.user?.email);
     console.log('Method:', method);
     console.log('Path:', path);
-    console.log('Headers:', req.headers);
-    console.log('Body:', req.body);
 
     // Kiểm tra webhookManager
     if (!webhookManager) {
@@ -158,28 +169,56 @@ async function handleManagementAPI(req, res) {
 
     let result;
 
-    // Route requests
+    // Webhook Management Routes
     if (method === 'GET' && path === '/api/webhooks') {
       console.log('📋 Listing webhooks...');
       result = await webhookManager.listWebhooks();
     
     } else if (method === 'POST' && path === '/api/webhooks') {
-      console.log('🆕 Creating webhook from CLIENT...');
+      console.log('🆕 Creating webhook...');
       
-      // Validate request body
       if (!req.body || typeof req.body !== 'object') {
         throw new Error('Invalid request body');
       }
       
-      result = await webhookManager.createWebhook(req.body);
-      console.log('✅ Webhook created successfully from CLIENT');
+      const webhookData = {
+        ...req.body,
+        createdBy: req.user?.uid || 'unknown',
+        creatorEmail: req.user?.email || 'unknown'
+      };
+      
+      result = await webhookManager.createWebhook(webhookData);
+      console.log('✅ Webhook created successfully');
+    
+    } 
+    // API Key Management Routes
+    else if (method === 'POST' && path === '/api/keys') {
+      console.log('🔑 Creating API key...');
+      result = await apiKeyService.createApiKey(req.user.uid, req.body);
+    
+    } else if (method === 'GET' && path === '/api/keys') {
+      console.log('📋 Listing API keys...');
+      result = await apiKeyService.listUserApiKeys(req.user.uid);
+    
+    } else if (method === 'DELETE' && path.startsWith('/api/keys/')) {
+      const keyId = path.split('/')[3];
+      console.log(`🗑️ Revoking API key: ${keyId}`);
+      result = await apiKeyService.revokeApiKey(keyId, req.user.uid);
     
     } else {
-      return res.status(404).json({ error: 'Management endpoint not found' });
+      return res.status(404).json({ 
+        error: 'Management endpoint not found',
+        availableEndpoints: [
+          'GET /api/webhooks',
+          'POST /api/webhooks', 
+          'GET /api/keys',
+          'POST /api/keys',
+          'DELETE /api/keys/{id}'
+        ]
+      });
     }
 
-    // ✅ FIX: Đảm bảo luôn có response
-    console.log('📤 FINAL RESPONSE:', JSON.stringify(result, null, 2));
+    console.log('📤 Management API response:', JSON.stringify(result, null, 2));
     
     if (method === 'POST') {
       res.status(201).json(result);
@@ -188,15 +227,13 @@ async function handleManagementAPI(req, res) {
     }
 
   } catch (error) {
-    console.error('💥 CLIENT MANAGEMENT API ERROR:', error);
+    console.error('💥 MANAGEMENT API ERROR:', error);
     
-    // ✅ FIX: Luôn trả về JSON response ngay cả khi lỗi
     const errorResponse = {
       error: 'Management API error',
       message: error.message
     };
     
-    console.log('📤 Sending ERROR response:', JSON.stringify(errorResponse, null, 2));
     res.status(500).json(errorResponse);
   }
 }
@@ -209,5 +246,5 @@ function getClientIP(req) {
          (req.connection.socket ? req.connection.socket.remoteAddress : 'unknown');
 }
 
-console.log('Cloud Function initialized successfully');
+console.log('Cloud Function initialized successfully with Authentication');
 export { functions };
