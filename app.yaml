@@ -1,0 +1,12 @@
+runtime: nodejs22
+instance_class: F1
+
+env_variables:
+  NODE_ENV: production
+
+health_check:
+  enable_health_check: true
+  check_interval_sec: 30
+  timeout_sec: 10
+  unhealthy_threshold: 3
+  healthy_threshold: 2

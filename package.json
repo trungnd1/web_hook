@@ -1,0 +1,27 @@
+{
+  "name": "webhook-cloud-function",
+  "version": "2.0.0",
+  "description": "Webhook receiver with management APIs - Gen2 Optimized",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "npx @google-cloud/functions-framework --target=webhookService --port=8080 --signature-type=http",
+    "test": "node test.js",
+    "deploy": "gcloud functions deploy webhook-service --gen2 --runtime nodejs22 --trigger-http --allow-unauthenticated --source=. --entry-point=webhookService --memory=1Gi --timeout=300s --region=asia-southeast1 --min-instances=0 --max-instances=10",
+    "deploy-with-cpu": "gcloud functions deploy webhook-service --gen2 --runtime nodejs22 --trigger-http --allow-unauthenticated --source=. --entry-point=webhookService --memory=2Gi --cpu=1 --timeout=300s --region=asia-southeast1 --min-instances=0 --max-instances=5",
+    "logs": "gcloud functions logs read webhook-service --region=asia-southeast1 --limit=20",
+    "describe": "gcloud functions describe webhook-service --region=asia-southeast1"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^3.0.0",
+    "firebase-admin": "^12.1.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  }
+}
