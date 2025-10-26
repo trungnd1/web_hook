@@ -12,21 +12,24 @@ class FirestoreService {
   // ✅ FIX: Lazy initialization
   async ensureInitialized() {
     if (!this._initialized) {
-      let retries = 3;
-      while (retries > 0) {
-        try {
-          if (!admin.apps.length) {
-            admin.initializeApp();
-          }
-          this.db = admin.firestore();
-          this._initialized = true;
-          console.log('FirestoreService initialized successfully');
-          break;
-        } catch (error) {
-          retries--;
-          if (retries === 0) throw error;
-          await new Promise(resolve => setTimeout(resolve, 1000));
+      try {
+        if (!admin.apps.length) {
+          // ✅ FIX: Khởi tạo với database URL
+          admin.initializeApp({
+            // Database URL sẽ được auto-detected từ environment
+            // Hoặc set explicitly nếu cần:
+            databaseURL: 'https://ai-workflow-5d230-default-rtdb.asia-southeast1.firebasedatabase.app/'
+          });
+          console.log('Firebase Admin initialized with Realtime Database support');
         }
+        
+        this.db = admin.firestore();
+        this._initialized = true;
+        console.log('FirestoreService initialized successfully');
+        
+      } catch (error) {
+        console.error('FirestoreService initialization failed:', error);
+        throw error;
       }
     }
     return this._initialized;

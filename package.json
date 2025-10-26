@@ -8,7 +8,8 @@
     "start": "node index.js",
     "dev": "npx @google-cloud/functions-framework --target=webhookService --port=8080 --signature-type=http",
     "test": "node test.js",
-    "deploy": "gcloud functions deploy webhook-service --gen2 --runtime nodejs22 --trigger-http --allow-unauthenticated --source=. --entry-point=webhookService --memory=1Gi --timeout=300s --region=asia-southeast1 --min-instances=0 --max-instances=10",
+    "deploy": "gcloud functions deploy webhook-service --gen2 --runtime nodejs22 --trigger-http --allow-unauthenticated --source=. --entry-point=webhookService --memory=1Gi --timeout=300s --region=asia-southeast1 --min-instances=0 --max-instances=10 --set-env-vars=CLIENT_WEBHOOK_URL=https://your-client-domain.com/api/webhooks",    
+    "deploy-dev": "gcloud functions deploy webhook-service --gen2 --runtime nodejs22 --trigger-http --allow-unauthenticated --source=. --entry-point=webhookService --memory=1Gi --timeout=300s --region=asia-southeast1 --min-instances=0 --max-instances=10 --set-env-vars=CLIENT_WEBHOOK_URL=http://localhost:3000/api/webhooks",
     "deploy-with-cpu": "gcloud functions deploy webhook-service --gen2 --runtime nodejs22 --trigger-http --allow-unauthenticated --source=. --entry-point=webhookService --memory=2Gi --cpu=1 --timeout=300s --region=asia-southeast1 --min-instances=0 --max-instances=5",
     "logs": "gcloud functions logs read webhook-service --region=asia-southeast1 --limit=20",
     "describe": "gcloud functions describe webhook-service --region=asia-southeast1"
