@@ -12,19 +12,21 @@ class FirestoreService {
   // ✅ FIX: Lazy initialization
   async ensureInitialized() {
     if (!this._initialized) {
-      try {
-        // Kiểm tra nếu Firebase app đã được khởi tạo
-        if (!admin.apps.length) {
-          admin.initializeApp();
-          console.log('Firebase Admin initialized in FirestoreService');
+      let retries = 3;
+      while (retries > 0) {
+        try {
+          if (!admin.apps.length) {
+            admin.initializeApp();
+          }
+          this.db = admin.firestore();
+          this._initialized = true;
+          console.log('FirestoreService initialized successfully');
+          break;
+        } catch (error) {
+          retries--;
+          if (retries === 0) throw error;
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
-        
-        this.db = admin.firestore();
-        this._initialized = true;
-        console.log('FirestoreService initialized successfully');
-      } catch (error) {
-        console.error('FirestoreService initialization failed:', error);
-        throw error;
       }
     }
     return this._initialized;

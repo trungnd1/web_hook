@@ -1,6 +1,7 @@
 // web_hook/index.js - FIXED ROUTING FOR GEN2 WITH AUTHENTICATION
 import functions from '@google-cloud/functions-framework';
 import admin from 'firebase-admin';
+import apiKeyService from './src/apiKeyService.js';
 
 // ✅ FIX: Đảm bảo Firebase init hoàn thành TRƯỚC KHI import modules
 try {
@@ -83,7 +84,7 @@ functions.http('webhookService', async (req, res) => {
         version: '2.1.0'
       });
     }
-    else if (path.startsWith('/webhooks/') && path.split('/').length >= 4) {
+    else if (path.startsWith('/webhooks/') && path.split('/').length >= 3) {
       // Format: /webhooks/{webhookId}/{endpointPath}
       await handleWebhookReceiver(req, res);
     }
@@ -119,9 +120,10 @@ functions.http('webhookService', async (req, res) => {
 async function handleWebhookReceiver(req, res) {
   try {
     const pathParts = req.path.split('/').filter(part => part);
+    // pathParts = ['webhooks', 'wh_mh72w4qu_bf8crm', 'pull-requests', 'opened']
     
-    // ✅ FIX: Đảm bảo đúng format /webhooks/{id}/{path}
-    if (pathParts.length < 4) {
+    // ✅ FIX: Lấy toàn bộ endpointPath sau webhookId
+    if (pathParts.length < 3) {
       return res.status(404).json({ 
         error: "Invalid webhook URL format",
         expected: "/webhooks/{webhookId}/{endpointPath}",
@@ -130,7 +132,7 @@ async function handleWebhookReceiver(req, res) {
     }
 
     const webhookId = pathParts[1];
-    const endpointPath = pathParts[2];
+    const endpointPath = pathParts.slice(2).join('/'); // ✅ FIX: Lấy tất cả phần còn lại
 
     console.log(`Processing webhook: ${webhookId}, path: ${endpointPath}`);
 
